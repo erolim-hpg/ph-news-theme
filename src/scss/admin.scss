@@ -1,0 +1,27 @@
+.featured label {
+    margin: .2em .5em .2em 0;
+}
+
+th.column-featured {
+    width: 150px;
+    color: #C3922E !important;
+}
+
+td.column-featured {
+    font-size: 1.05em;
+}
+
+* {
+    font-family: Chivo;
+}
+
+#wpadminbar {
+    
+    .ab-item {
+        font-family: Chivo;
+        
+        &::before {
+            font-family: normal 20px/1 dashicons;
+        }
+    }
+}

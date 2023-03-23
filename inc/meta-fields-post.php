@@ -12,10 +12,29 @@ class CustomPostMeta
      */
     public function __construct()
     {
+        // Add meta box
         add_action('add_meta_boxes', array($this, 'add_box'));
+
+        // Handle save post to save meta fields
         add_action('save_post', array($this, 'save'));
+
+        // Register meta fields in REST
         $this->register_in_rest();
+
+        // Add filter by meta fields to REST
         add_action('rest_post_query', array($this, 'filter_request_meta'), 10, 2);
+
+        // Functions to add column, populate its content and to remove it on Screen Options
+        add_filter('manage_posts_columns', array($this, 'add_column'), 10, 2);
+        add_filter('manage_posts_custom_column', array($this, 'populate_column'), 10, 2);
+        add_filter('manage_edit_post_columns', array($this, 'remove_column'));
+
+        // Add custom box to Quick Edit & Bulk Edit
+        add_action('quick_edit_custom_box', array($this, 'quick_edit_custom_box'), 10, 2);
+        add_action('bulk_edit_custom_box', array($this, 'bulk_edit_custom_box'), 10, 2);
+        
+        // Handle save post to save meta fields on quick edit
+        add_action('save_post', array($this, 'quickedit_save'));
     }
 
     /**
@@ -59,16 +78,16 @@ class CustomPostMeta
         // Render
 ?>
         <div class="form-field">
-            <input type="checkbox" name="featured_spotlight" id="featured_spotlight" <?php if ($featured_spotlight) echo 'checked="true"'; ?>">
-            <label for="featured_spotlight"><?php _e('Featured in Spotlight?') ?></label>
-            <p class="components-form-token-field__help">News spotlight can be shown in various pages, such as Meet the Team.</p>
-        </div>
-        <div class="form-field">
             <input type="checkbox" name="featured_newspage" id="featured_newspage" <?php if ($featured_newspage) echo 'checked="true"'; ?>">
             <label for="featured_newspage"><?php _e('Featured in News Page Slider?') ?></label>
             <p class="components-form-token-field__help">Slider shown in the main News page.</p>
         </div>
-<?php
+        <div class="form-field">
+            <input type="checkbox" name="featured_spotlight" id="featured_spotlight" <?php if ($featured_spotlight) echo 'checked="true"'; ?>">
+            <label for="featured_spotlight"><?php _e('Featured in Spotlight?') ?></label>
+            <p class="components-form-token-field__help">News spotlight can be shown in various pages, such as Meet the Team.</p>
+        </div>
+        <?php
     }
 
     /**
@@ -85,7 +104,8 @@ class CustomPostMeta
         }
 
         // Check if nonce is valid
-        if (!wp_verify_nonce($_POST['ph_post_meta_nonce'], 'ph_post_meta')) {
+        if (!wp_verify_nonce($_POST['ph_post_meta_nonce'], 'ph_post_meta') 
+            && !wp_verify_nonce($_POST['_inline_edit'], 'inlineeditnonce')) {
             return $post_id;
         }
 
@@ -113,7 +133,7 @@ class CustomPostMeta
         );
 
         foreach ($fields as $field) {
-            if (!isset($_POST[$field])){
+            if (!isset($_POST[$field])) {
                 delete_post_meta($post_id, $field);
                 continue;
             }
@@ -169,6 +189,126 @@ class CustomPostMeta
         $args['meta_value'] = $request['meta_value'];
 
         return $args;
+    }
+
+    /**
+     * Add column to manage posts page
+     *
+     * @param mixed $posts_columns
+     * @param string $post_type
+     * @return void
+     */
+    public function add_column($posts_columns, $post_type)
+    {
+        $posts_columns['featured'] = '★ Featured in ★';
+        return $posts_columns;
+    }
+
+    /**
+     * Populate column in manage posts page
+     *
+     * @param string $column_name
+     * @param int $post_id
+     * @return void
+     */
+    public function populate_column($column_name, $post_id)
+    {
+        // if you have to populate more that one columns, use switch()
+        if ($column_name == 'featured') {
+            $newspage = get_post_meta($post_id, 'featured_newspage', true);
+            $spotlight = get_post_meta($post_id, 'featured_spotlight', true);
+            if ($newspage) {
+                echo 'Newspage';
+                if ($spotlight)  echo ', <br>'; // Echo separator if both are true
+            }
+            if ($spotlight)
+                echo 'Spotlight';
+        }
+    }
+
+    /**
+     * Remove column
+     *
+     * @param Array|Object $posts_columns
+     * @return Array|Object
+     */
+    public function remove_column($posts_columns)
+    {
+        unset($posts_columns['featured']);
+        return $posts_columns;
+    }
+
+    /**
+     * Quick edit custom box
+     *
+     * @param string $column_name
+     * @param string $post_type
+     * @return void
+     */
+    public function quick_edit_custom_box($column_name, $post_type)
+    {
+        if ($column_name == 'featured') :
+        ?>
+            <fieldset class="inline-edit-col-left">
+                <div class="inline-edit-col featured">
+                    <label for="featured_newspage">
+                        <input type="checkbox" name="featured_newspage" id="featured_newspage">
+                        <span class="checkbox-title">Feature in Newspage?</span>
+                    </label>
+                </div>
+                <div class="inline-edit-col featured">
+                    <label for="featured_spotlight">
+                        <input type="checkbox" name="featured_spotlight" id="featured_spotlight">
+                        <span class="checkbox-title">Feature in Spotlight?</span>
+                    </label>
+                </div>
+            </fieldset>
+        <?php
+        endif;
+    }
+
+    /**
+     * Bulk edit custom box
+     *
+     * @param string $column_name
+     * @param string $post_type
+     * @return void
+     */
+    public function bulk_edit_custom_box($column_name, $post_type)
+    {
+        if ($column_name == 'featured') {
+            echo 'Extra content in the bulk edit box';
+        }
+    }
+    
+    /**
+     * Save meta data after quick edit
+     *
+     * @param int $post_id
+     * @return void|int
+     */
+    public function quickedit_save($post_id)
+    {
+        // Check if nonce is valid
+        if (!isset($_POST['_inline_edit']) || !wp_verify_nonce($_POST['_inline_edit'], 'inlineeditnonce')) {
+            return;
+        }
+
+        /* Sanitize input and update post meta */
+
+        $fields = array(
+            'featured_newspage',
+            'featured_spotlight'
+        );
+
+        foreach ($fields as $field) {
+            if (!isset($_POST[$field])) {
+                delete_post_meta($post_id, $field);
+                continue;
+            }
+            $value = $_POST[$field] == 'on' ? 1 : 0;
+            update_post_meta($post_id, $field, $value);
+        }
     }
 }
 

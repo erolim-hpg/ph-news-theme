@@ -1,2 +1,2 @@
 <?php
-    header( "Location: https://portugalhomes.com/news" );
+    // header( "Location: https://portugalhomes.com/news" );
