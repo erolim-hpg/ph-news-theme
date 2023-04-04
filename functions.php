@@ -44,14 +44,14 @@ final class Theme_Functions
 
         // Setup theme support, nav menus, etc.
         add_action("after_setup_theme", array($this, "theme_setup"));
-        
+
         // Add action to define custom excerpt
         add_filter("excerpt_length", array($this, "custom_excerpt_len"), 999);
         add_filter('excerpt_more', array($this, 'new_excerpt_more'));
         // Setup theme support, nav menus, etc.
         add_action("after_setup_theme", array($this, "theme_setup"));
-        
-        if(!current_user_can('manage_options')) {
+
+        if (!current_user_can('manage_options')) {
             add_action("admin_menu", array($this, "remove_menus"));
         }
     }
@@ -86,9 +86,10 @@ final class Theme_Functions
         // Directory of files to be included
         $dir = THEME_INC_DIR;
 
-        require_once($dir . 'meta-fields-category.php');
-        require_once($dir . 'meta-fields-post.php');
+        require_once($dir . 'category-custom-meta.php');
+        require_once($dir . 'post-custom-meta.php');
         require_once($dir . 'customize-login-page.php');
+        require_once($dir . 'filter-headings.php');
     }
 
     /**
@@ -170,6 +171,10 @@ final class Theme_Functions
         wp_enqueue_script('theme-admin-js', $dir . 'js/admin.js', ["jquery"], $version, false);
         wp_enqueue_style('theme-admin-css', $dir . 'css/admin.css', null, $version, false);
         wp_enqueue_style('chivo-font', $dir . 'fonts/Chivo/font.css', null, $version, false);
+
+        wp_enqueue_style('bootstrap-icons', $dir . 'fonts/bootstrap-icons/bootstrap-icons.css', [], "1.5.0", false);
+        wp_enqueue_style('fontawesome', 'https://kit.fontawesome.com/951c3cf9d8.js', [], null, false);
+        
     }
 
     /**
@@ -207,12 +212,24 @@ final class Theme_Functions
     }
 
 
-    public function remove_menus() {
-        remove_menu_page( 'themes.php' );
-        remove_menu_page( 'edit.php?post_type=page' );
-        remove_menu_page( 'edit-comments.php' );
-        remove_menu_page( 'tools.php' );
+    public function remove_menus()
+    {
+        remove_menu_page('themes.php');
+        remove_menu_page('edit.php?post_type=page');
+        remove_menu_page('edit-comments.php');
+        remove_menu_page('tools.php');
     }
 }
 
 new Theme_Functions();
+
+function custom_frontend_url( $permalink, $post ) { 
+	$custom_permalink = str_replace( home_url(), 'http://127.0.0.1:8000',  $permalink );
+
+	return $custom_permalink; 
+}; 
+			
+add_filter( 'page_link', 'custom_frontend_url', 10, 2 ); 
+add_filter( 'post_link', 'custom_frontend_url', 10, 2 );
+// If you use custom post types also add this filter.
+add_filter( 'post_type_link', 'custom_frontend_url', 10, 2 ); 

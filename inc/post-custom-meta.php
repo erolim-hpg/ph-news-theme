@@ -4,7 +4,7 @@
  * Create customized post meta fields and render
  * - https://developer.wordpress.org/reference/functions/add_meta_box/
  */
-class CustomPostMeta
+class PostCustomMeta
 {
 
     /**
@@ -12,6 +12,8 @@ class CustomPostMeta
      */
     public function __construct()
     {
+        add_action('init', array($this, 'change_post_labels'));
+
         // Add meta box
         add_action('add_meta_boxes', array($this, 'add_box'));
 
@@ -32,9 +34,28 @@ class CustomPostMeta
         // Add custom box to Quick Edit & Bulk Edit
         add_action('quick_edit_custom_box', array($this, 'quick_edit_custom_box'), 10, 2);
         add_action('bulk_edit_custom_box', array($this, 'bulk_edit_custom_box'), 10, 2);
-        
+
         // Handle save post to save meta fields on quick edit
         add_action('save_post', array($this, 'quickedit_save'));
+    }
+
+    public function change_post_labels()
+    {
+        $post_type = get_post_type_object('post');
+        $labels = $post_type->labels;
+        $labels->name = 'Articles';
+        $labels->singular_name = 'Article';
+        $labels->add_new = 'Add Article';
+        $labels->add_new_item = 'Add New Article';
+        $labels->edit_item = 'Edit Article';
+        $labels->new_item = 'Article';
+        $labels->view_item = 'View Article';
+        $labels->search_items = 'Search Articles';
+        $labels->not_found = 'No Article found';
+        $labels->not_found_in_trash = 'No Article found in Trash';
+        $labels->all_items = 'All Articles';
+        $labels->menu_name = 'Articles';
+        $labels->name_admin_bar = 'Articles';
     }
 
     /**
@@ -104,8 +125,10 @@ class CustomPostMeta
         }
 
         // Check if nonce is valid
-        if (!wp_verify_nonce($_POST['ph_post_meta_nonce'], 'ph_post_meta') 
-            && !wp_verify_nonce($_POST['_inline_edit'], 'inlineeditnonce')) {
+        if (
+            !wp_verify_nonce($_POST['ph_post_meta_nonce'], 'ph_post_meta')
+            && !wp_verify_nonce($_POST['_inline_edit'], 'inlineeditnonce')
+        ) {
             return $post_id;
         }
 
@@ -263,7 +286,7 @@ class CustomPostMeta
                     </label>
                 </div>
             </fieldset>
-        <?php
+<?php
         endif;
     }
 
@@ -280,7 +303,7 @@ class CustomPostMeta
             echo 'Extra content in the bulk edit box';
         }
     }
-    
+
     /**
      * Save meta data after quick edit
      *
@@ -312,4 +335,4 @@ class CustomPostMeta
     }
 }
 
-new CustomPostMeta();
+new PostCustomMeta();
