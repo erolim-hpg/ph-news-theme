@@ -40,6 +40,9 @@ final class Theme_Functions
         // Import theme files
         $this->theme_imports();
 
+        add_filter('rest_prepare_post', array($this, 'expose_acf_to_rest_api'), 10, 3);
+        add_filter('rest_prepare_page', array($this, 'expose_acf_to_rest_api'), 10, 3);
+
         add_action("admin_enqueue_scripts", array($this, "theme_admin_scripts"));
 
         // Setup theme support, nav menus, etc.
@@ -116,6 +119,17 @@ final class Theme_Functions
         );
     }
 
+    function expose_acf_to_rest_api($response, $post, $request)
+    {
+        if (!function_exists('get_fields')) return $response;
+
+        if (isset($post)) {
+            $acf = get_fields($post->id);
+            $response->data['acf'] = $acf;
+        }
+        return $response;
+    }
+
     /**
      * Setup theme support, nav menus, etc.
      *
@@ -174,7 +188,6 @@ final class Theme_Functions
 
         wp_enqueue_style('bootstrap-icons', $dir . 'fonts/bootstrap-icons/bootstrap-icons.css', [], "1.5.0", false);
         wp_enqueue_style('fontawesome', 'https://kit.fontawesome.com/951c3cf9d8.js', [], null, false);
-        
     }
 
     /**
@@ -223,13 +236,17 @@ final class Theme_Functions
 
 new Theme_Functions();
 
-function custom_frontend_url( $permalink, $post ) { 
-	$custom_permalink = str_replace( home_url(), 'http://127.0.0.1:8000',  $permalink );
+function custom_frontend_url($permalink, $post_id)
+{    
+    if (get_post_meta($post_id, '_wp_page_template', true) == 'page-landing.php') {
+        $custom_permalink = str_replace(home_url(), 'https://portugalhomes.com/lp',  $permalink);
+    } else {
+        $custom_permalink = str_replace(home_url(), 'https://portugalhomes.com',  $permalink);
+    }
 
-	return $custom_permalink; 
-}; 
-			
-add_filter( 'page_link', 'custom_frontend_url', 10, 2 ); 
-add_filter( 'post_link', 'custom_frontend_url', 10, 2 );
-// If you use custom post types also add this filter.
-add_filter( 'post_type_link', 'custom_frontend_url', 10, 2 ); 
+    return $custom_permalink;
+};
+
+add_filter('page_link', 'custom_frontend_url', 10, 2);
+add_filter('post_link', 'custom_frontend_url', 10, 2);
+add_filter('post_type_link', 'custom_frontend_url', 10, 2);
