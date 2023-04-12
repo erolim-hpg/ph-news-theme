@@ -40,9 +40,7 @@ final class Theme_Functions
         // Import theme files
         $this->theme_imports();
 
-        add_filter('rest_prepare_post', array($this, 'expose_acf_to_rest_api'), 10, 3);
-        add_filter('rest_prepare_page', array($this, 'expose_acf_to_rest_api'), 10, 3);
-
+        // Enqueue theme scripts
         add_action("admin_enqueue_scripts", array($this, "theme_admin_scripts"));
 
         // Setup theme support, nav menus, etc.
@@ -57,6 +55,18 @@ final class Theme_Functions
         if (!current_user_can('manage_options')) {
             add_action("admin_menu", array($this, "remove_menus"));
         }
+
+        // Customize frontend URL for pages & posts links 
+        add_filter('page_link', array($this, 'custom_frontend_url'), 10, 2);
+        add_filter('post_link', array($this, 'custom_frontend_url'), 10, 2);
+        add_filter('post_type_link', array($this, 'custom_frontend_url'), 10, 2);
+
+        // Expose ACF to the REST API
+        add_filter('rest_prepare_post', array($this, 'expose_acf_to_rest_api'), 10, 3);
+        add_filter('rest_prepare_page', array($this, 'expose_acf_to_rest_api'), 10, 3);
+        
+        // Add lang filter parameter to every post type
+        add_action('rest_api_init', array($this, 'add_lang_param_to_rest'));
     }
 
     /**
@@ -93,41 +103,6 @@ final class Theme_Functions
         require_once($dir . 'post-custom-meta.php');
         require_once($dir . 'customize-login-page.php');
         require_once($dir . 'filter-headings.php');
-    }
-
-    /**
-     * Register REST API field for the post and term metadata 
-     *
-     * @since 1.0
-     */
-    public static function register_metadata_in_rest()
-    {
-        register_rest_field('post', 'metadata', array(
-            'get_callback' => function ($data) {
-                return get_post_meta($data['id'], 'featured', true);
-            },
-        ));
-
-        add_filter(
-            'rest_prepare_category',
-            function ($response, $item, $request) {
-                $response->data['color'] = get_term_meta($item->term_id, '_category_color', true);
-                return $response;
-            },
-            10,
-            3
-        );
-    }
-
-    function expose_acf_to_rest_api($response, $post, $request)
-    {
-        if (!function_exists('get_fields')) return $response;
-
-        if (isset($post)) {
-            $acf = get_fields($post->id);
-            $response->data['acf'] = $acf;
-        }
-        return $response;
     }
 
     /**
@@ -191,6 +166,88 @@ final class Theme_Functions
     }
 
     /**
+     * Create custom frontend URL for different Home URL
+     *
+     * @param string $permalink
+     * @param int $post_id
+     * @return void
+     */
+    public static function custom_frontend_url($permalink, $post_id)
+    {
+        if (get_post_meta($post_id, '_wp_page_template', true) == 'page-landing.php') {
+            $custom_permalink = str_replace(home_url() . '/', 'https://portugalhomes.com/lp/?page=',  $permalink);
+        } else {
+            $custom_permalink = str_replace(home_url(), 'https://portugalhomes.com',  $permalink);
+        }
+
+        return $custom_permalink;
+    }
+
+    /**
+     * Register REST API field for the post and term metadata 
+     *
+     * @since 1.0
+     */
+    public static function register_metadata_in_rest()
+    {
+        register_rest_field('post', 'metadata', array(
+            'get_callback' => function ($data) {
+                return get_post_meta($data['id'], 'featured', true);
+            },
+        ));
+
+        register_rest_field('post', 'lang', array(
+            'get_callback' => function ($data) {
+                return pll_get_post_language($data['id'], 'slug');
+            },
+        ));
+
+        add_filter(
+            'rest_prepare_category',
+            function ($response, $item, $request) {
+                $response->data['color'] = get_term_meta($item->term_id, '_category_color', true);
+                return $response;
+            },
+            10,
+            3
+        );
+    }
+
+    function expose_acf_to_rest_api($response, $post, $request)
+    {
+        if (!function_exists('get_fields')) return $response;
+
+        if (isset($post)) {
+            $acf = get_fields($post->id);
+            $response->data['acf'] = $acf;
+        }
+        return $response;
+    }
+
+    /**
+     * Add new filter parameter for Language to REST requests for every post type
+     *
+     * @param array $args
+     * @param [type] $request
+     * @return void
+     */
+    public static function add_lang_param_to_rest () {
+        foreach (get_post_types(array('show_in_rest' => true), 'objects') as $post_type) {
+            add_filter('rest_' . $post_type->name . '_query', function($args, $request) {
+                $lang = $request->get_param('lang');
+
+                if (!$lang) {
+                    return $args;
+                }
+        
+                $args['lang'] = $lang;
+        
+                return $args;
+            }, 10, 2);
+        }
+    }
+
+    /**
      * Get theme version
      *
      * @return string Theme Version
@@ -228,25 +285,9 @@ final class Theme_Functions
     public function remove_menus()
     {
         remove_menu_page('themes.php');
-        remove_menu_page('edit.php?post_type=page');
         remove_menu_page('edit-comments.php');
         remove_menu_page('tools.php');
     }
 }
 
 new Theme_Functions();
-
-function custom_frontend_url($permalink, $post_id)
-{    
-    if (get_post_meta($post_id, '_wp_page_template', true) == 'page-landing.php') {
-        $custom_permalink = str_replace(home_url(), 'https://portugalhomes.com/lp',  $permalink);
-    } else {
-        $custom_permalink = str_replace(home_url(), 'https://portugalhomes.com',  $permalink);
-    }
-
-    return $custom_permalink;
-};
-
-add_filter('page_link', 'custom_frontend_url', 10, 2);
-add_filter('post_link', 'custom_frontend_url', 10, 2);
-add_filter('post_type_link', 'custom_frontend_url', 10, 2);
